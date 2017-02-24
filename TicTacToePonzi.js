@@ -17,7 +17,21 @@ contract TicTacToePonzi {
 
         bool canWithdraw;
 
+        bool playing; //Currently in a game
+
     }
+
+    struct GameStatus{
+        bool inGame; //Is there a game going on?
+
+        Player[] pl; //Current Players
+
+        //Maybe variable for board state?
+
+
+    }
+
+    //maybe game status struct
 
     uint256 buyInThreshold; //Amount needed to buy in
     uint256 potBalance;  //Ammount of money from deposits and payments
@@ -33,15 +47,22 @@ contract TicTacToePonzi {
 
         
         
-        players.push(Player(msg.sender, pos,  Wager, 0, Wager, false));
+        players.push(Player(msg.sender, pos,  Wager, 0, Wager, false, false));
 
+        //DEPOSIT THE MONEY INTO POT, TAKE MONEY FROM WALLET (how do we do this?)
 
     }
 
-    function getPlayer(address addr) private returns (Player){
+    function getTime() public {
+
+        //calls win if blocks or time past an hour
+    }
+
+
+    function getPlayerAddr(address addr) private returns (uint256){
         for(uint256 i = 0; i < players.length; i++) {
             if(players[i].addr == addr) {
-                return players[i];
+                return i;
             }
         }
     }
@@ -50,21 +71,26 @@ contract TicTacToePonzi {
         return buyInThreshold;
     }
 
-    function playGame() payable {
+    function playGame() public payable {
+
+        //check if 2 players are in gameStatus and both are not in a game already and no other game is going on 
+
+        
         potBalance += msg.value;
          
-        //Player player = getPlayer(msg.sender);
+        Player player = players[getPlayerAddr(msg.sender)];
         if(msg.value * 10 / 11 >= buyInThreshold){  //Challenger commits 1.1x buyIn by default. Refunded later if he wins and chooses not to increase
             //then do stuff
             
             
  
                 //PLAY GAME HERE
+                //create new contract within contract (reference contract address)
 
 
 
                 //challenger chooses how much money to input (minimum 1.1 if he loses, 1.0 if he wins), gets refund if msg.value > chosen value
-                //gameNum++;
+
             
 
 
@@ -78,16 +104,16 @@ contract TicTacToePonzi {
     }
 
     function withdrawFunds() public {
-        // Player player = getPlayer(msg.sender);
-        // if(player.addr == msg.origin){
-        //     uint256 accountBalance = player.totalOwned;
-        //     player.deposit = 0;
-        //     player.value = 0;
-        //     player.totalOwned = 0;
-        //     if (!(player.addr.deposit.value(accountBalance)())) {
-        //             throw;
-        //         }
-        // }
+        Player player = players[getPlayerAddr(msg.sender)];
+        if(player.addr == msg.sender){
+            uint256 accountBalance = player.totalOwned;
+            player.deposit = 0;
+            player.value = 0;
+            player.totalOwned = 0;
+            // if (!(player.addr.deposit.value(accountBalance)())) {
+            //         throw;
+            //     }
+        }
     }
 
 
