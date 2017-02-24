@@ -38,7 +38,7 @@ contract TicTacToePonzi {
     Player[] players;
 
 
-    function TicTacToePonzi(uint256 Wager) {
+    function TicTacToePonzi(uint256 investment) {
         uint256 pos = 0;
         
         if(players.length == 1){
@@ -47,7 +47,7 @@ contract TicTacToePonzi {
 
         
         
-        players.push(Player(msg.sender, pos,  Wager, 0, Wager, false, false));
+        players.push(Player(msg.sender, pos,  investment, 0, investment, false, false));
 
         //DEPOSIT THE MONEY INTO POT, TAKE MONEY FROM WALLET (how do we do this?)
 
