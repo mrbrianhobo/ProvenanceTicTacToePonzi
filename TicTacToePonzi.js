@@ -36,15 +36,16 @@ contract TicTacToePonzi {
 
     //maybe game status struct
 
-    uint256 buyInThreshold = 0.1; //Amount needed to buy in. Defaulted to .1 ether. ***Can also change to owner choosing***
+    uint256 buyInThreshold = 1; 
+    //Amount needed to buy in. Defaulted to .1 ether. ***Can also change to owner choosing***
     uint256 potBalance;  //Amount of money from deposits and payments
 
     Player[] players;
 
 
-    function TicTacToePonzi() {
+    function TicTacToePonzi() payable {
 
-        uint256 pos ;
+        uint256 pos;
         if(players.length == 0 || players.length == 1){  //Owner of the contract (person who deployed)
             pos = players.length;
         }    
@@ -52,15 +53,15 @@ contract TicTacToePonzi {
             pos = 2;
         }
         
-        Player temp = Player(msg.sender, pos,  0, 0, msg.value, false, false);
-        players.push(temp);
+
+        players.push(Player(msg.sender, pos,  0, 0, msg.value, false, false));
 
 
         if(pos == 0 || pos == 1){
-            pl[pos] = temp;
+            currentPlayers[pos] = players[getPlayerAddr(msg.sender)];
         }
         else{
-            queue.push(temp);
+            queue.push(players[getPlayerAddr(msg.sender)]);
         }
 
         //DEPOSIT THE MONEY INTO POT, TAKE MONEY FROM WALLET (how do we do this?)
@@ -68,17 +69,18 @@ contract TicTacToePonzi {
     }
 
     function getQueuePos() public returns (int) {
-        Player temp = Player[getPlayerAddr(msg.sender)];
-        int i = 0;
+        Player temp = players[getPlayerAddr(msg.sender)];
+        uint256 i = 0;
         if(queue.length == 0){
-            System.out.println("You are not in the queue or there is no queue");
+            //System.out.println("You are not in the queue or there is no queue");
+            return -1;
         }
-        for(; i < queue.length; i++){
-            if(temp == players[i]){
-                return i + 1;
+        for(i = 0; i < queue.length; i++){
+            if(msg.sender == players[i].addr){
+               return (int) (i + 1);
             }
         }
-        System.out.println("You are not in the queue")
+        // System.out.println("You are not in the queue");
         return -1;
     }
 
@@ -92,11 +94,11 @@ contract TicTacToePonzi {
         //Can call out opponent being too late, lose when you try to play after 1 hr
     }
 
-    function updateQueue(Player[] arr, int loc) private {
-        if(arr.length <= 0 || loc >= arr.length){
+    function updateQueue(Player[] arr, uint256 loc) private {
+        if(arr.length <= 0 || loc >=  arr.length){
             return;
         }
-        for(int i = loc; i < arr.length-1; i++){
+        for(uint256 i = loc; i < arr.length -1; i++){
             arr[i] = arr[i+1];
         }
         delete arr[i+1];
@@ -116,31 +118,31 @@ contract TicTacToePonzi {
     }
 
 
-    function playGame(int money) public payable {
+    function playGame(uint256 money) public payable {
 
         if(player.totalOwned < money){
             player.deposit += player.totalOwned;
             player.totalOwned = 0;
-            System.out.println("You don't have that much money");
+            // System.out.println("You don't have that much money");
         }
 
         //check if 2 players are in gameStatus and both are not in a game already and no other game is going on 
-        if(inGame || currentPlayers.length != 2 || currentPlayers[0] == currentPlayers[1] || currentPlayers[0].playing || currentPlayers[1].playing){
-            System.out.println("Someone is in a game");
+        if(inGame || currentPlayers.length != 2 || currentPlayers[0].addr == currentPlayers[1].addr || currentPlayers[0].playing || currentPlayers[1].playing){
+            // System.out.println("Someone is in a game");
             throw;
         }
         
         Player player = players[getPlayerAddr(msg.sender)];
-        if(player.pos != 1){
+        if(player.position != 1){
             throw; //Only challenger can start the game
         }
-        ingame = true;
+        inGame = true;
 
         player.totalOwned -= money;
 
         
         if(money * 10 / 11 < buyInThreshold){
-            System.out.println("You don't have enought money. You money has been sent to your account deposit");
+            // System.out.println("You don't have enough money. You money has been sent to your account deposit");
             player.deposit += money;
             return;
         } 
@@ -198,22 +200,23 @@ contract TicTacToePonzi {
             return;
         }
 
-        if(player.pos == 0 && pl[0] == player){  //payees cant leave 
+        if(player.position == 0 && currentPlayers[0].addr == player.addr){  //payees cant leave 
             return;
         }
-        else if(player.pos == 1 && pl[1] == player){
+        else if(player.position == 1 && currentPlayers[1].addr == player.addr){
 
             if(queue.length == 0){
                 delete currentPlayers[1];
             }
             else{
-                currentPlayers[1] == queue[0];
+                currentPlayers[1] = queue[0];
                 updateQueue(queue, 0);
             }
 
         }
-        else if(player.pos == 2){
-            updateQueue(queue, player.getQueuePos());
+        else if(player.position == 2){
+            int temp = getQueuePos();
+            updateQueue(queue, (uint256) (temp));
         }
 
         //Send all funds back to wallet somehow
@@ -228,8 +231,8 @@ contract TicTacToePonzi {
         //Challenger becommes new payee with value of however much he paid
 
 
-        pl[0].value = buyInThreshold;
-        pl[1].value = buyInThreshold;
+        currentPlayers[0].value = buyInThreshold;
+        currentPlayers[1].value = buyInThreshold;
 
 
 
@@ -249,7 +252,7 @@ contract TicTacToePonzi {
             delete currentPlayers[1];
         }
         else{
-            currentPlayers[1] == queue[0];
+            currentPlayers[1] = queue[0];
             currentPlayers[1].position = 1;
             updateQueue(queue, 0);
         }
@@ -264,7 +267,7 @@ contract TicTacToePonzi {
 
         //How to account for the challenger being able to choose? We can give the win lower bounds? 
 
-        pl[1].value = buyInThreshold;
+        currentPlayers[1].value = buyInThreshold;
 
 
 
@@ -286,7 +289,7 @@ contract TicTacToePonzi {
             delete currentPlayers[1];
         }
         else{
-            currentPlayers[1] == queue[0];
+            currentPlayers[1] = queue[0];
             currentPlayers[1].position = 1;
             updateQueue(queue, 0);
         }
