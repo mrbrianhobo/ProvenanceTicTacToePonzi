@@ -3,6 +3,7 @@ pragma solidity ^0.4.6;
 contract TicTacToePonzi {
 
     //TODO: Implement Challenger choosing amount after win, Time checks, Turns using deployment.
+    //Think about how we could get around people getting up after a queue and not starting a game. If we call them out should they lose money? 
 
     address owner;
 
@@ -10,14 +11,14 @@ contract TicTacToePonzi {
         address addr;
 
         uint256 position; 
-        //1 for Challenger and 0 for Payee. 2 for queue 
+        //0 for Payee, 1 for Challenger, and 2 for Queue 
         
         uint256 value; //Amount of money in pot from winnings. Becomes 0 after witdrawal
-        uint256 deposit; //If doesn't meet threshold
+        uint256 deposit; //If doesn't meet threshold, money is stored in deposit
 
         uint256 totalOwned; //Value + Deposit + msg.value (investment) . How much money owned in the contract
 
-        bool canWithdraw;
+        bool canWithdraw; //True if someone after you has paid.
 
         bool playing; //Currently in a game
 
@@ -35,7 +36,7 @@ contract TicTacToePonzi {
 
     //maybe game status struct
 
-    uint256 buyInThreshold = 1; //Amount needed to buy in. Defaulted to 1 ether.
+    uint256 buyInThreshold = 0.1; //Amount needed to buy in. Defaulted to .1 ether. ***Can also change to owner choosing***
     uint256 potBalance;  //Amount of money from deposits and payments
 
     Player[] players;
@@ -52,7 +53,6 @@ contract TicTacToePonzi {
         }
         
         Player temp = Player(msg.sender, pos,  0, 0, msg.value, false, false);
-
         players.push(temp);
 
 
@@ -71,15 +71,17 @@ contract TicTacToePonzi {
         Player temp = Player[getPlayerAddr(msg.sender)];
         int i = 0;
         if(queue.length == 0){
-            return 0;
+            System.out.println("You are not in the queue or there is no queue");
         }
         for(; i < queue.length; i++){
             if(temp == players[i]){
                 return i + 1;
             }
         }
+        System.out.println("You are not in the queue")
         return -1;
     }
+
 
     function getTime() public {
 
@@ -116,8 +118,15 @@ contract TicTacToePonzi {
 
     function playGame(int money) public payable {
 
+        if(player.totalOwned < money){
+            player.deposit += player.totalOwned;
+            player.totalOwned = 0;
+            System.out.println("You don't have that much money");
+        }
+
         //check if 2 players are in gameStatus and both are not in a game already and no other game is going on 
         if(inGame || currentPlayers.length != 2 || currentPlayers[0] == currentPlayers[1] || currentPlayers[0].playing || currentPlayers[1].playing){
+            System.out.println("Someone is in a game");
             throw;
         }
         
@@ -125,18 +134,24 @@ contract TicTacToePonzi {
         if(player.pos != 1){
             throw; //Only challenger can start the game
         }
-
         ingame = true;
-        currentPlayers[0].playing = true;
-        currentPlayers[1].playing = true;
 
-
-        potBalance += money;
         player.totalOwned -= money;
+
         
-        
-        if(money * 10 / 11 >= buyInThreshold){  //Challenger commits 1.1x buyIn by default. Refunded later if he wins and chooses not to increase
+        if(money * 10 / 11 < buyInThreshold){
+            System.out.println("You don't have enought money. You money has been sent to your account deposit");
+            player.deposit += money;
+            return;
+        } 
+
+        else if(money * 10 / 11 >= buyInThreshold){  //Challenger commits 1.1x buyIn by default. Refunded later if he wins and chooses not to increase
             //then do stuff
+
+            currentPlayers[0].playing = true;
+            currentPlayers[1].playing = true;
+
+            potBalance += money;
             buyInThreshold = money;
             
             
@@ -152,19 +167,9 @@ contract TicTacToePonzi {
 
 
         }
-        else{
-            //player.deposit += msg.value;
-        }
-
-
-
-
-
 
         //Game ends: Queue updated, game statuses updated, current players updated. All called in win functions
         
-
-
     }
 
     function withdrawFunds() public {
@@ -174,6 +179,11 @@ contract TicTacToePonzi {
             player.totalOwned += player.value;
             player.deposit = 0;
             player.value = 0;
+            player.canWithdraw = false;  
+
+            //WHAT HAPPENS IF PLAYER GOES BACK INTO GAME A SECOND TIME AND IS ABLE TO WITHDRAW AGAIN BEFORE OTHER PERSON PAYS? 
+            //our mechanics might prevent because challenger pays
+
             // if (!(player.addr.deposit.value(accountBalance)())) {
             //         throw;
             //     }
@@ -223,17 +233,24 @@ contract TicTacToePonzi {
 
 
 
+        inGame = false;
 
         currentPlayers[0].playing = false;
         currentPlayers[1].playing = false;
+
+        currentPlayers[0].position = 2;
+        currentPlayers[1].position = 0;
+
         currentPlayers[0].canWithdraw = true;
-        inGame = false;
         currentPlayers[0] = currentPlayers[1];
+
+
         if(queue.length == 0){
             delete currentPlayers[1];
         }
         else{
             currentPlayers[1] == queue[0];
+            currentPlayers[1].position = 1;
             updateQueue(queue, 0);
         }
 
@@ -253,16 +270,24 @@ contract TicTacToePonzi {
 
 
 
+        inGame = false;
+
         currentPlayers[0].playing = false;
         currentPlayers[1].playing = false;
+
+        currentPlayers[0].position = 2;
+        currentPlayers[1].position = 0;
+
         currentPlayers[0].canWithdraw = true;
-        inGame = false;
         currentPlayers[0] = currentPlayers[1];
+
+
         if(queue.length == 0){
             delete currentPlayers[1];
         }
         else{
             currentPlayers[1] == queue[0];
+            currentPlayers[1].position = 1;
             updateQueue(queue, 0);
         }
 
