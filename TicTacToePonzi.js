@@ -2,6 +2,8 @@ pragma solidity ^0.4.6;
 
 contract TicTacToePonzi {
 
+    //TODO: Implement Challenger choosing amount after win, Time checks, Turns using deployment.
+
     address owner;
 
      struct Player {
@@ -13,7 +15,7 @@ contract TicTacToePonzi {
         uint256 value; //Amount of money in pot from winnings. Becomes 0 after witdrawal
         uint256 deposit; //If doesn't meet threshold
 
-        uint256 totalOwned; //Value + Deposit + investment. How much money owned in the contract
+        uint256 totalOwned; //Value + Deposit + msg.value (investment) . How much money owned in the contract
 
         bool canWithdraw;
 
@@ -22,25 +24,25 @@ contract TicTacToePonzi {
 
     }
 
-    struct GameStatus{
-        bool inGame; //Is there a game going on?
+    bool inGame; //Is there a game going on?
 
-        Player[] currentPlayers; //Current Players
+    Player[] currentPlayers; //Current Players
 
-        Player[] queue;
+    Player[] queue;
 
-        //Maybe variable for board state?
+    //Maybe variable for board state?
 
-    }
 
     //maybe game status struct
 
-    uint256 buyInThreshold; //Amount needed to buy in
-    uint256 potBalance;  //Ammount of money from deposits and payments
+    uint256 buyInThreshold = 1; //Amount needed to buy in. Defaulted to 1 ether.
+    uint256 potBalance;  //Amount of money from deposits and payments
+
     Player[] players;
 
 
-    function TicTacToePonzi(uint256 investment) {
+    function TicTacToePonzi() {
+
         uint256 pos ;
         if(players.length == 0 || players.length == 1){  //Owner of the contract (person who deployed)
             pos = players.length;
@@ -49,7 +51,7 @@ contract TicTacToePonzi {
             pos = 2;
         }
         
-        Player temp = Player(msg.sender, pos,  0, 0, investment, false, false);
+        Player temp = Player(msg.sender, pos,  0, 0, msg.value, false, false);
 
         players.push(temp);
 
@@ -82,6 +84,10 @@ contract TicTacToePonzi {
     function getTime() public {
 
         //calls win if blocks or time past an hour
+        //make local variable with blocktime of start. then call most recent block to see if move is within 1 hr
+
+        //Put call out functions:
+        //Can call out opponent being too late, lose when you try to play after 1 hr
     }
 
     function updateQueue(Player[] arr, int loc) private {
@@ -107,23 +113,31 @@ contract TicTacToePonzi {
         return buyInThreshold;
     }
 
-    function playGame() public payable {
+
+    function playGame(int money) public payable {
 
         //check if 2 players are in gameStatus and both are not in a game already and no other game is going on 
         if(inGame || currentPlayers.length != 2 || currentPlayers[0] == currentPlayers[1] || currentPlayers[0].playing || currentPlayers[1].playing){
             throw;
         }
         
+        Player player = players[getPlayerAddr(msg.sender)];
+        if(player.pos != 1){
+            throw; //Only challenger can start the game
+        }
 
         ingame = true;
-        currentPlayers[0].playing = false;
-        currentPlayers[1].playing = false;
+        currentPlayers[0].playing = true;
+        currentPlayers[1].playing = true;
 
-        potBalance += msg.value;
-         
-        Player player = players[getPlayerAddr(msg.sender)];
-        if(msg.value * 10 / 11 >= buyInThreshold){  //Challenger commits 1.1x buyIn by default. Refunded later if he wins and chooses not to increase
+
+        potBalance += money;
+        player.totalOwned -= money;
+        
+        
+        if(money * 10 / 11 >= buyInThreshold){  //Challenger commits 1.1x buyIn by default. Refunded later if he wins and chooses not to increase
             //then do stuff
+            buyInThreshold = money;
             
             
  
@@ -142,24 +156,13 @@ contract TicTacToePonzi {
             //player.deposit += msg.value;
         }
 
-        //player.totalOwned = player.deposit + player.value;
 
 
 
 
-        //Game ends: Queue updated, game statuses updated, current players updated.
-        currentPlayers[0].playing = false;
-        currentPlayers[1].playing = false;
-        currentPlayers[0].canWithdraw = true;
-        inGame = false;
-        currentPlayers[0] = currentPlayers[1];
-        if(queue.length == 0){
-            delete currentPlayers[1];
-        }
-        else{
-            currentPlayers[1] == queue[0];
-            updateQueue(queue, 0);
-        }
+
+        //Game ends: Queue updated, game statuses updated, current players updated. All called in win functions
+        
 
 
     }
@@ -211,15 +214,57 @@ contract TicTacToePonzi {
     function payeeWinsOrDraws() payable {
 
         //change player.value and player.totalOwned of payee
-        //change player.canWithdraw to true for payee
+
         //Challenger becommes new payee with value of however much he paid
+
+
+        pl[0].value = buyInThreshold;
+        pl[1].value = buyInThreshold;
+
+
+
+
+        currentPlayers[0].playing = false;
+        currentPlayers[1].playing = false;
+        currentPlayers[0].canWithdraw = true;
+        inGame = false;
+        currentPlayers[0] = currentPlayers[1];
+        if(queue.length == 0){
+            delete currentPlayers[1];
+        }
+        else{
+            currentPlayers[1] == queue[0];
+            updateQueue(queue, 0);
+        }
 
     }
 
     function challengerWins() payable {
 
-        //Payee values stay same, but canWithdraw becomes true.
+        //Payee values stay same
         //Challenger becomes payee with value of however much he decides to pay
+
+
+        //How to account for the challenger being able to choose? We can give the win lower bounds? 
+
+        pl[1].value = buyInThreshold;
+
+
+
+
+
+        currentPlayers[0].playing = false;
+        currentPlayers[1].playing = false;
+        currentPlayers[0].canWithdraw = true;
+        inGame = false;
+        currentPlayers[0] = currentPlayers[1];
+        if(queue.length == 0){
+            delete currentPlayers[1];
+        }
+        else{
+            currentPlayers[1] == queue[0];
+            updateQueue(queue, 0);
+        }
 
 
     }
