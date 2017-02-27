@@ -17,13 +17,13 @@ contract TicTacToePonzi {
         bool playing;           // Currently in a game
     }
 
-    Player[] players;           // TODO what's the point of this if we have current players and queue?
+    Player[] players;           // List of players waiting to pay
     Player[] currentPlayers;    // Current Players
     Player[] queue;             // Queue of players waiting to play
 
     bool inGame;                // Is there a game going on?
     uint256 lastMove;           // when the last move was performed
-    uint256 lastPlayer;         // who the last move was performed by
+    Player lastPlayer;         // who the last move was performed by
 
     //Maybe variable for board state?
 
@@ -46,112 +46,106 @@ contract TicTacToePonzi {
         players.push(Player(msg.sender, pos, 0, 0, msg.value, false, false));
 
         if (pos == 0 || pos == 1) {
-            currentPlayers[pos] = players[getPlayerAddr(msg.sender)];           // TODO what? This is an address, not an array index?
+            currentPlayers[pos] = players[getPlayerIndex(msg.sender)];           // TODO what? This is an address, not an array index?
         }
         else {
-            queue.push(players[getPlayerAddr(msg.sender)]);                     // TODO same as above comment
+            queue.push(players[getPlayerIndex(msg.sender)]);                     // TODO same as above comment
         }
 
     }
 
+    /*
+     * Returns the queue position for the querier.
+     */
     function getQueuePos() public returns (int) {
-        Player temp = players[getPlayerAddr(msg.sender)];
+        Player temp = players[getPlayerIndex(msg.sender)];
         uint256 i = 0;
-        if(queue.length == 0){
-            //System.out.println("You are not in the queue or there is no queue");
-            return -1;
-        }
-        for (i = 0; i < queue.length; i++){
+
+        for (i = 0; i < queue.length; i++) {
             if (msg.sender == players[i].addr) {
                return (int) (i + 1);
             }
         }
-        // System.out.println("You are not in the queue");
-        return -1;
+
+        return -1;      // if the queue is empty
     }
 
 
-
-    function getTime() public {
-
-
-        //calls win if blocks or time past an hour
-        //make local variable with blocktime of start. then call most recent block to see if move is within 1 hr
-
-        //Put call out functions:
-        //Can call out opponent being too late, lose when you try to play after 1 hr
-    }
-
-    /* If more than an hour has passed, call this function to end the game.
+    /*
+     * Attempt to end the game: will end if more than an hour has passed since the last move.
      */
     function endGame() public returns (bool) {
-        if (block.timestamp > lastMove + 3600) {       // if the current block is an hour past the lastMove 
-            if (lastPlayer == 0) {
-                // refund player 1
+        if (block.timestamp > lastMove + 3600) {       // if the current block is an hour past the lastMove
+            // refund the player who played last
+            success = lastPlayer.addr.send(lastPlayer.totalOwned);
+            if (success) {
+                lastPlayer.totalOwned = 0;
+                resetGame();        // TODO implement this
             }
-            else if (lastPlayer == 1) {
-                // refund player 2
-            }
-            else {
-                return false;
-            }
-
-            return true;
+            return success;
         }
     }
 
+    /*
+     * Move everyone up in the queue.
+     */
     function updateQueue(Player[] arr, uint256 loc) private {
-        if(arr.length <= 0 || loc >=  arr.length){
+        if (arr.length <= 0 || loc >=  arr.length) {
             return;
         }
-        for(uint256 i = loc; i < arr.length -1; i++){
+        for (uint256 i = loc; i < arr.length -1; i++) {
             arr[i] = arr[i+1];
         }
         delete arr[i+1];
     }
 
-
-    function getPlayerAddr(address addr) private returns (uint256){
-        for(uint256 i = 0; i < players.length; i++) {
-            if(players[i].addr == addr) {
+    /*
+     * Returns the index of the given player.
+     */
+    function getPlayerIndex(address addr) private returns (uint256) {
+        for (uint256 i = 0; i < players.length; i++) {
+            if (players[i].addr == addr) {
                 return i;
             }
         }
     }
 
-    function getBuyInThreshold() returns (uint256){
+    /*
+     * Returns the minimum amount needed to buy in to the game.
+     */
+    function getBuyInThreshold() public returns (uint256) {
         return buyInThreshold;
     }
 
-
+    /*
+     * Start the game.
+     */
     function playGame(uint256 money) public payable {
 
-        if(player.totalOwned < money){
+        // Insufficient funds
+        if(player.totalOwned < money) {
             player.deposit += player.totalOwned;
             player.totalOwned = 0;
-            // System.out.println("You don't have that much money");
         }
 
         //check if 2 players are in gameStatus and both are not in a game already and no other game is going on
-        if(inGame || currentPlayers.length != 2 || currentPlayers[0].addr == currentPlayers[1].addr || currentPlayers[0].playing || currentPlayers[1].playing){
-            // System.out.println("Someone is in a game");
-            throw;          // TODO remove this
+        if(inGame || currentPlayers.length != 2 || currentPlayers[0].addr == currentPlayers[1].addr || currentPlayers[0].playing || currentPlayers[1].playing) {
+            throw;        // TODO remove this
         }
 
-        Player player = players[getPlayerAddr(msg.sender)];
-        if(player.position != 1){
-            throw; // TODO remove this
+        Player player = players[getPlayerIndex(msg.sender)];
+        if(player.position != 1) {
+            throw;       // TODO remove this
         }
 
 
-        if(money * 10 / 11 < buyInThreshold){
-            // System.out.println("You don't have enough money. You money has been sent to your account deposit");
+        if(money * 10 / 11 < buyInThreshold) {
             player.deposit += money;
             // TODO move player from the queue; if not, stop the game.
             return;
         }
 
-        else if(money * 10 / 11 >= buyInThreshold){  //Challenger commits 1.1x buyIn by default. Refunded later if he wins and chooses not to increase
+        else if(money * 10 / 11 >= buyInThreshold) {  //Challenger commits 1.1x buyIn by default. Refunded later if he wins and chooses not to increase
             //then do stuff
 
             // Start the game.
@@ -165,54 +159,57 @@ contract TicTacToePonzi {
             potBalance += money;
             buyInThreshold = money;
 
-                //PLAY GAME HERE
-                //create new contract within contract (reference contract address)
+            TicTacToe game = TicTacToe();
+            game.start();
+            while (!game.has_ended()) {
+                game.play();        // TODO forward inputs to TicTacToe game contract
+            }
 
-
-
-                //challenger chooses how much money to input (minimum 1.1 if he loses, 1.0 if he wins), gets refund if msg.value > chosen value
-
-
-
+            // challenger chooses how much money to input (minimum 1.1 if he loses, 1.0 if he wins), gets refund if msg.value > chosen value
 
         }
 
-        //Game ends: Queue updated, game statuses updated, current players updated. All called in win functions
+        // Game ends: Queue updated, game statuses updated, current players updated. All called in win functions
 
     }
 
+    /*
+     * Allows player to withdraw the money associated with their account (original input & winnings).
+     */
     function withdrawFunds() public {
-        Player player = players[getPlayerAddr(msg.sender)];
-        if(player.addr == msg.sender){
+        Player player = players[getPlayerIndex(msg.sender)];
+        if(player.addr == msg.sender) {
             player.totalOwned += player.deposit;
             player.totalOwned += player.value;
             player.deposit = 0;
             player.value = 0;
             player.canWithdraw = false;
 
-            //WHAT HAPPENS IF PLAYER GOES BACK INTO GAME A SECOND TIME AND IS ABLE TO WITHDRAW AGAIN BEFORE OTHER PERSON PAYS?
+            //
+            // WHAT HAPPENS IF PLAYER GOES BACK INTO GAME A SECOND TIME AND IS ABLE TO WITHDRAW AGAIN BEFORE OTHER PERSON PAYS?
             //our mechanics might prevent because challenger pays
-
             // if (!(player.addr.deposit.value(accountBalance)())) {
             //         throw;
             //     }
         }
     }
 
+    /*
+     * Allows you to leave the game only if player is not in a game and there is not a payee.
+     */
     function leaveGame() public {
-        //Allows you to leave the game only if player is not in a game and is not a payee.
 
-        Player player = players[getPlayerAddr(msg.sender)];
-        if(player.playing){
+        Player player = players[getPlayerIndex(msg.sender)];
+        if(player.playing) {
             return;
         }
 
-        if(player.position == 0 && currentPlayers[0].addr == player.addr){  //payees cant leave
+        if(player.position == 0 && currentPlayers[0].addr == player.addr) {  //payees cant leave
             return;
         }
-        else if(player.position == 1 && currentPlayers[1].addr == player.addr){
+        else if(player.position == 1 && currentPlayers[1].addr == player.addr) {
 
-            if(queue.length == 0){
+            if(queue.length == 0) {
                 delete currentPlayers[1];
             }
             else{
@@ -221,7 +218,7 @@ contract TicTacToePonzi {
             }
 
         }
-        else if(player.position == 2){
+        else if (player.position == 2) {
             int temp = getQueuePos();
             updateQueue(queue, (uint256) (temp));
         }
@@ -230,18 +227,14 @@ contract TicTacToePonzi {
 
     }
 
-
+    /*
+     * The case where the payee wins the pot, or there is a draw.
+     * The challenger becomes the payee, with the wager equal to how much they paid.
+     */
     function payeeWinsOrDraws() payable {
-
-        //change player.value and player.totalOwned of payee
-
-        //Challenger becommes new payee with value of however much he paid
-
-
+        // TODO change player.totalOwned of payee
         currentPlayers[0].value = buyInThreshold;
         currentPlayers[1].value = buyInThreshold;
-
-
 
         inGame = false;
 
@@ -254,11 +247,10 @@ contract TicTacToePonzi {
         currentPlayers[0].canWithdraw = true;
         currentPlayers[0] = currentPlayers[1];
 
-
-        if(queue.length == 0){
+        if (queue.length == 0) {
             delete currentPlayers[1];
         }
-        else{
+        else {
             currentPlayers[1] = queue[0];
             currentPlayers[1].position = 1;
             updateQueue(queue, 0);
@@ -266,19 +258,13 @@ contract TicTacToePonzi {
 
     }
 
+    /*
+     * The case where the challenger wins the pot.
+     * Payee values remain the same.
+     */
     function challengerWins() payable {
-
-        //Payee values stay same
-        //Challenger becomes payee with value of however much he decides to pay
-
-
-        //How to account for the challenger being able to choose? We can give the win lower bounds?
-
+        // TODO How to account for the challenger being able to choose? We can give the win lower bounds?
         currentPlayers[1].value = buyInThreshold;
-
-
-
-
 
         inGame = false;
 
@@ -291,17 +277,14 @@ contract TicTacToePonzi {
         currentPlayers[0].canWithdraw = true;
         currentPlayers[0] = currentPlayers[1];
 
-
-        if(queue.length == 0){
+        if (queue.length == 0) {
             delete currentPlayers[1];
         }
-        else{
+        else {
             currentPlayers[1] = queue[0];
             currentPlayers[1].position = 1;
             updateQueue(queue, 0);
         }
-
-
     }
 
 
@@ -400,7 +383,7 @@ contract TicTacToe
             else {
                 bool y = g.opposition.send(g.balance);
             }
-            
+
             g.balance = 0;
             clear(host);
         }
