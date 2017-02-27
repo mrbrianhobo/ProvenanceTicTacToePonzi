@@ -7,7 +7,7 @@ contract TicTacToePonzi {
 
     address owner;
 
-     struct Player {
+    struct Player {
         address addr;
         uint256 position;       // 0 for Payee, 1 for Challenger, and 2 for Queue
         uint256 value;          // Amount of money in pot from winnings. Becomes 0 after witdrawal
@@ -61,7 +61,7 @@ contract TicTacToePonzi {
             //System.out.println("You are not in the queue or there is no queue");
             return -1;
         }
-        for (i = 0; i < queue.length; i++)
+        for (i = 0; i < queue.length; i++){
             if (msg.sender == players[i].addr) {
                return (int) (i + 1);
             }
@@ -69,6 +69,7 @@ contract TicTacToePonzi {
         // System.out.println("You are not in the queue");
         return -1;
     }
+
 
 
     function getTime() public {
@@ -84,7 +85,7 @@ contract TicTacToePonzi {
     /* If more than an hour has passed, call this function to end the game.
      */
     function endGame() public returns (bool) {
-        if (block.timestamp > lastMove + 3600) {       // if the current block is an hour past the lastMove
+        if (block.timestamp > lastMove + 3600) {       // if the current block is an hour past the lastMove 
             if (lastPlayer == 0) {
                 // refund player 1
             }
@@ -163,8 +164,6 @@ contract TicTacToePonzi {
 
             potBalance += money;
             buyInThreshold = money;
-
-
 
                 //PLAY GAME HERE
                 //create new contract within contract (reference contract address)
@@ -324,7 +323,7 @@ contract TicTacToe
 
     mapping (address => Game) games;
 
-    function start() has_value
+    function start() payable has_value
     {
         Game g = games[msg.sender];
         if(g.balance == 0)
@@ -334,7 +333,7 @@ contract TicTacToe
         }
     }
 
-    function join(address host) has_value
+    function join(address host) payable has_value
     {
         Game g = games[host];
         if(g.opposition == 0
