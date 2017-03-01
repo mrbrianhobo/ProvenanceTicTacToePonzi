@@ -33,7 +33,7 @@ contract TicTacToePonzi {
     uint256 potBalance;         // Amount of money from deposits and payments
 
 
-    function TicTacToePonzi() payable {
+    function join() payable {
 
         uint256 pos;
         if (players.length == 0 || players.length == 1) {
