@@ -2,17 +2,14 @@ pragma solidity ^0.4.6;
 
 contract TicTacToePonzi {
 
-    //TODO: Implement Challenger choosing amount after win, Time checks, Turns using deployment.
-    //Think about how we could get around people getting up after a queue and not starting a game. If we call them out should they lose money?
-
     address owner;
 
     struct Player {
         address addr;
-        uint256 position;       // 0 for Payee, 1 for Challenger, and 2 for Queue
-        uint256 value;          // Amount of money in pot from winnings. Becomes 0 after witdrawal
-        uint256 deposit;        // If doesn't meet threshold, money is stored in deposit
-        uint256 totalOwned;     // Value + Deposit + msg.value (investment) . How much money owned in the contract
+        uint position;       // 0 for Payee, 1 for Challenger, and 2 for Queue
+        uint value;          // Amount of money in pot from winnings. Becomes 0 after witdrawal
+        uint deposit;        // If doesn't meet threshold, money is stored in deposit
+        uint totalOwned;     // Value + Deposit + msg.value (investment) . How much money owned in the contract
         bool canWithdraw;       // True if someone after you has paid.
         bool playing;           // Currently in a game
     }
@@ -22,7 +19,7 @@ contract TicTacToePonzi {
     Player[] queue;             // Queue of players waiting to play
 
     bool inGame;                // Is there a game going on?
-    uint256 lastMoveTime;           // when the last move was performed
+    uint lastMoveTime;           // when the last move was performed
     Player playerTurn;
     Player lastPlayer;          // who the last move was performed by
 
@@ -31,12 +28,12 @@ contract TicTacToePonzi {
     uint numTurns = 0;
     //maybe game status struct
 
-    uint256 buyInThreshold = 1; // Amount needed to buy in. Defaulted to .1 ether. ***Can also change to owner choosing***
-    uint256 potBalance;         // Amount of money from deposits and payments
+    uint buyInThreshold = 1; // Amount needed to buy in. Defaulted to .1 ether. ***Can also change to owner choosing***
+    uint potBalance;         // Amount of money from deposits and payments
 
 
     function join() payable {
-        uint256 pos;
+        uint pos;
         if (players.length == 0 || players.length == 1) {
             pos = players.length;
         }
@@ -60,7 +57,7 @@ contract TicTacToePonzi {
      */
     function getQueuePos() public returns (int) {
         Player temp = players[getPlayerIndex(msg.sender)];
-        uint256 i = 0;
+        uint i = 0;
 
         for (i = 0; i < queue.length; i++) {
             if (msg.sender == players[i].addr) {
@@ -75,7 +72,7 @@ contract TicTacToePonzi {
     /*
      * Attempt to end the game: will end if more than an hour has passed since the last move.
      */
-    function checkTime() public {
+    function checkTimeLimit() public returns (string) {
         if (block.timestamp > lastMoveTime + 3600) {       // if the current block is an hour past the lastMove
             // refund the player who played last
 
@@ -85,17 +82,20 @@ contract TicTacToePonzi {
             else if(currentPlayer() == 2){
                 payeeWinsOrDraws();
             }
+
+            return "It's been over an hour since you made a move. You have won.";
         }
+        return "It hasn't been an hour";
     }
 
     /*
      * Move everyone up in the queue.
      */
-    function updateQueue(Player[] arr, uint256 loc) private {
+    function updateQueue(Player[] arr, uint loc) private {
         if (arr.length <= 0 || loc >=  arr.length) {
             return;
         }
-        for (uint256 i = loc; i < arr.length -1; i++) {
+        for (uint i = loc; i < arr.length -1; i++) {
             arr[i] = arr[i+1];
         }
         delete arr[i+1];
@@ -104,8 +104,8 @@ contract TicTacToePonzi {
     /*
      * Returns the index of the given player.
      */
-    function getPlayerIndex(address addr) private returns (uint256) {
-        for (uint256 i = 0; i < players.length; i++) {
+    function getPlayerIndex(address addr) private returns (uint) {
+        for (uint i = 0; i < players.length; i++) {
             if (players[i].addr == addr) {
                 return i;
             }
@@ -115,20 +115,17 @@ contract TicTacToePonzi {
     /*
      * Returns the minimum amount needed to buy in to the game.
      */
-    function getBuyInThreshold() public returns (uint256) {
+    function getBuyInThreshold() public returns (uint) {
         return buyInThreshold;
     }
 
     /*
      * Start the game.
      */
-    function startGame(uint256 money) public payable {
+    function startGame(uint money) public {
 
         // Insufficient funds
-        if(player.totalOwned < money) {
-            player.deposit += player.totalOwned;
-            player.totalOwned = 0;
-        }
+        
 
         //check if 2 players are in gameStatus and both are not in a game already and no other game is going on
         if(inGame || currentPlayers.length != 2 || currentPlayers[0].addr == currentPlayers[1].addr || currentPlayers[0].playing || currentPlayers[1].playing) {
@@ -140,6 +137,10 @@ contract TicTacToePonzi {
             throw;       // TODO remove this
         }
 
+        if(player.totalOwned < money) {
+            player.deposit += player.totalOwned;
+            player.totalOwned = 0;
+        }
 
         if(money * 10 / 11 < buyInThreshold) {
             player.deposit += money;
@@ -218,7 +219,7 @@ contract TicTacToePonzi {
         }
         else if (player.position == 2) {
             int temp = getQueuePos();
-            updateQueue(queue, (uint256) (temp));
+            updateQueue(queue, (uint) (temp));
         }
 
         //Send all funds back to wallet somehow
@@ -229,7 +230,7 @@ contract TicTacToePonzi {
      * The case where the payee wins the pot, or there is a draw.
      * The challenger becomes the payee, with the wager equal to how much they paid.
      */
-    function payeeWinsOrDraws() payable {
+    function payeeWinsOrDraws() private {
         // TODO change player.totalOwned of payee
         currentPlayers[0].value = buyInThreshold;
         currentPlayers[1].value = buyInThreshold;
@@ -262,7 +263,7 @@ contract TicTacToePonzi {
      * The case where the challenger wins the pot.
      * Payee values remain the same.
      */
-    function challengerWins() payable {
+    function challengerWins() private {
         // TODO How to account for the challenger being able to choose? We can give the win lower bounds?
         currentPlayers[1].value = buyInThreshold;
 
@@ -297,7 +298,19 @@ contract TicTacToePonzi {
         uint curr = currentPlayer();
         if (curr == 0 ||  players[getPlayerIndex(msg.sender)].addr != currentPlayers[curr].addr) throw; //not payee or challenger
         if (players[getPlayerIndex(msg.sender)].addr != playerTurn.addr) throw; //not the right player
-        checkTime();
+
+        if (block.timestamp > lastMoveTime + 3600) {       // if the current block is an hour past the lastMove
+            // refund the player who played last
+
+            if (currentPlayer() == 1){
+                challengerWins();
+            }
+            else if(currentPlayer() == 2){
+                payeeWinsOrDraws();
+            }
+        }
+
+
         if(board[place] == 0) {
             board[place] = curr;
         } else throw; //tile already occupied
@@ -308,6 +321,7 @@ contract TicTacToePonzi {
             playerTurn = currentPlayers[0];
         }
         numTurns++;
+        lastMoveTime = block.timestamp;  
 
 
         return getCurrentState();  
@@ -380,7 +394,7 @@ contract TicTacToePonzi {
         return (text, string(out), whoseTurn);
     }
 
-    function clearBoard() returns (string) {
+    function clearBoard() private returns (string) {
         board = new uint[](9);
         return "Board cleared.";
     }
