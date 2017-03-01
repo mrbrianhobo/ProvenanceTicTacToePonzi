@@ -22,11 +22,13 @@ contract TicTacToePonzi {
     Player[] queue;             // Queue of players waiting to play
 
     bool inGame;                // Is there a game going on?
-    uint256 lastMove;           // when the last move was performed
-    Player lastPlayer;         // who the last move was performed by
+    uint256 lastMoveTime;           // when the last move was performed
+    Player playerTurn;
+    Player lastPlayer;          // who the last move was performed by
 
     //Maybe variable for board state?
-
+    uint[] board = new uint[](9);
+    uint numTurns = 0;
     //maybe game status struct
 
     uint256 buyInThreshold = 1; // Amount needed to buy in. Defaulted to .1 ether. ***Can also change to owner choosing***
@@ -34,7 +36,6 @@ contract TicTacToePonzi {
 
 
     function join() payable {
-
         uint256 pos;
         if (players.length == 0 || players.length == 1) {
             pos = players.length;
@@ -74,15 +75,16 @@ contract TicTacToePonzi {
     /*
      * Attempt to end the game: will end if more than an hour has passed since the last move.
      */
-    function endGame() public returns (bool) {
-        if (block.timestamp > lastMove + 3600) {       // if the current block is an hour past the lastMove
+    function checkTime() public {
+        if (block.timestamp > lastMoveTime + 3600) {       // if the current block is an hour past the lastMove
             // refund the player who played last
-            success = lastPlayer.addr.send(lastPlayer.totalOwned);
-            if (success) {
-                lastPlayer.totalOwned = 0;
-                resetGame();        // TODO implement this
+
+            if (currentPlayer() == 1){
+                challengerWins();
             }
-            return success;
+            else if(currentPlayer() == 2){
+                payeeWinsOrDraws();
+            }
         }
     }
 
@@ -120,7 +122,7 @@ contract TicTacToePonzi {
     /*
      * Start the game.
      */
-    function playGame(uint256 money) public payable {
+    function startGame(uint256 money) public payable {
 
         // Insufficient funds
         if(player.totalOwned < money) {
@@ -150,7 +152,7 @@ contract TicTacToePonzi {
 
             // Start the game.
             inGame = true;
-            lastMove = block.timestamp;     // TODO is this right? Maybe we should wait for a move to be done?
+            lastMoveTime = block.timestamp;     // TODO is this right? Maybe we should wait for a move to be done?
             player.totalOwned -= money;
 
             currentPlayers[0].playing = true;
@@ -159,11 +161,7 @@ contract TicTacToePonzi {
             potBalance += money;
             buyInThreshold = money;
 
-            TicTacToe game = TicTacToe();
-            game.start();
-            while (!game.has_ended()) {
-                game.play();        // TODO forward inputs to TicTacToe game contract
-            }
+            playerTurn = currentPlayers[1];
 
             // challenger chooses how much money to input (minimum 1.1 if he loses, 1.0 if he wins), gets refund if msg.value > chosen value
 
@@ -237,6 +235,7 @@ contract TicTacToePonzi {
         currentPlayers[1].value = buyInThreshold;
 
         inGame = false;
+        numTurns = 0;
 
         currentPlayers[0].playing = false;
         currentPlayers[1].playing = false;
@@ -255,6 +254,7 @@ contract TicTacToePonzi {
             currentPlayers[1].position = 1;
             updateQueue(queue, 0);
         }
+        clearBoard();
 
     }
 
@@ -267,6 +267,7 @@ contract TicTacToePonzi {
         currentPlayers[1].value = buyInThreshold;
 
         inGame = false;
+        numTurns = 0;
 
         currentPlayers[0].playing = false;
         currentPlayers[1].playing = false;
@@ -285,9 +286,103 @@ contract TicTacToePonzi {
             currentPlayers[1].position = 1;
             updateQueue(queue, 0);
         }
+
+        clearBoard();
     }
 
 
-}
+    function makeMove(uint row, uint col) returns (string, string, string) {
+        if (!inGame) throw; //no game going on
+        uint place = getTile(row,col);
+        uint curr = currentPlayer();
+        if (curr == 0 ||  players[getPlayerIndex(msg.sender)].addr != currentPlayers[curr].addr) throw; //not payee or challenger
+        if (players[getPlayerIndex(msg.sender)].addr != playerTurn.addr) throw; //not the right player
+        checkTime();
+        if(board[place] == 0) {
+            board[place] = curr;
+        } else throw; //tile already occupied
+        if(curr == 1){
+            playerTurn = currentPlayers[1];
+        }
+        else{
+            playerTurn = currentPlayers[0];
+        }
+        numTurns++;
+
+
+        return getCurrentState();  
+    }
+
+    function currentPlayer() private returns (uint) {
+        if (playerTurn.addr == currentPlayers[0].addr) return 1;
+        if (playerTurn.addr == currentPlayers[1].addr) return 2;
+        else return 0;
+    }
+
+    function getTile(uint row, uint col) private returns (uint) {
+        if (row == 1 && col == 1) return 0;
+        if (row == 1 && col == 2) return 1;
+        if (row == 1 && col == 3) return 2;
+        if (row == 2 && col == 1) return 3;
+        if (row == 2 && col == 2) return 4;
+        if (row == 2 && col == 3) return 5;
+        if (row == 3 && col == 1) return 6;
+        if (row == 3 && col == 2) return 7;
+        if (row == 3 && col == 3) return 8;
+        else throw; //not on the board
+    }
+    
+    uint[][]  tests = [[0,1,2],[3,4,5],[6,7,8], [0,3,6],[1,4,7],[2,5,8], [0,4,8],[2,4,6]  ];
+    function checkWinner() constant returns (uint) {
+        for (uint i = 0; i < 8; i++) {
+            uint[] memory b = tests[i];
+            if(board[b[0]] != 0 && board[b[0]] == board[b[1]] && board[b[0]] == board[b[2]]) return board[b[0]];
+        }
+        return 0;
+    }
+
+    function getCurrentState() constant returns(string, string, string) {
+        string memory text = "No winner yet";
+        string memory whoseTurn;
+        uint winner = checkWinner();
+        if(numTurns == 9){
+            text = "Game ended in a draw";
+            payeeWinsOrDraws();
+        }
+        if (winner == 1) {
+            text = "Winner is Payee (O)";
+            payeeWinsOrDraws();
+        }
+        if (winner == 2) {
+            text = "Winner is Challenger (X)";
+            challengerWins();
+        } 
+
+        bytes memory out = new bytes(11);
+        byte[] memory signs = new byte[](3);
+        signs[0] = "-";
+        signs[1] = "O";
+        signs[2] = "X";
+        bytes(out)[3] = "|";
+        bytes(out)[7] = "|";
+        
+        for(uint i = 0; i < 9; i++) {
+            bytes(out)[i + i/3] = signs[board[i]];  
+        }
+
+        if (currentPlayer() == 1) {
+            whoseTurn = "Payee's turn";
+        }
+        if (currentPlayer() == 2) {
+            whoseTurn = "Challenger's turn";
+        }
+
+        return (text, string(out), whoseTurn);
+    }
+
+    function clearBoard() returns (string) {
+        board = new uint[](9);
+        return "Board cleared.";
+    }
 
 }
