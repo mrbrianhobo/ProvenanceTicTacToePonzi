@@ -44,10 +44,10 @@ contract TicTacToePonzi {
         players.push(Player(msg.sender, pos, 0, 0, msg.value, false, false));
 
         if (pos == 0 || pos == 1) {
-            currentPlayers[pos] = players[getPlayerIndex(msg.sender)];           // TODO what? This is an address, not an array index?
+            currentPlayers[pos] = players[getPlayerIndex(msg.sender)];          
         }
         else {
-            queue.push(players[getPlayerIndex(msg.sender)]);                     // TODO same as above comment
+            queue.push(players[getPlayerIndex(msg.sender)]);               
         }
 
     }
