@@ -15,7 +15,7 @@ contract TicTacToePonzi {
     }
 
     Player[] players;           // List of players waiting to pay
-    Player[] currentPlayers;    // Current Players
+    Player[2] currentPlayers;    // Current Players
     Player[] queue;             // Queue of players waiting to play
 
     bool inGame;                // Is there a game going on?
@@ -172,6 +172,19 @@ contract TicTacToePonzi {
 
     }
 
+    function isThereAGame() public returns (bool){
+        return inGame;
+    }
+
+    function currentPlayerTurn() public returns (string){
+        if(playerTurn.addr == currentPlayers[0].addr){
+            return "Payee's turn";
+        }
+        else{
+            return "Challengers turn";
+        }
+    }
+
     /*
      * Allows player to withdraw the money associated with their account (original input & winnings).
      */
@@ -184,12 +197,6 @@ contract TicTacToePonzi {
             player.value = 0;
             player.canWithdraw = false;
 
-            //
-            // WHAT HAPPENS IF PLAYER GOES BACK INTO GAME A SECOND TIME AND IS ABLE TO WITHDRAW AGAIN BEFORE OTHER PERSON PAYS?
-            //our mechanics might prevent because challenger pays
-            // if (!(player.addr.deposit.value(accountBalance)())) {
-            //         throw;
-            //     }
         }
     }
 
@@ -223,6 +230,11 @@ contract TicTacToePonzi {
         }
 
         //Send all funds back to wallet somehow
+        if(player.canWithdraw){
+            if(!msg.sender.send(player.totalOwned)){
+                throw;
+            }
+        }
 
     }
 
