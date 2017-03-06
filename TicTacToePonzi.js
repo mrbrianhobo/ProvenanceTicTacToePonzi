@@ -305,12 +305,11 @@ contract TicTacToePonzi {
 
 
     function makeMove(uint row, uint col) returns (string, string, string) {
-        if (!inGame) throw; //no game going on
+        //if (!inGame) throw; //no game going on
         uint place = getTile(row,col);
         uint curr = currentPlayer();
-        if (curr == 0 ||  players[getPlayerIndex(msg.sender)].addr != currentPlayers[curr].addr) throw; //not payee or challenger
-        if (players[getPlayerIndex(msg.sender)].addr != playerTurn.addr) throw; //not the right player
-
+        //if (players[getPlayerIndex(msg.sender)].addr != currentPlayers[curr].addr) throw; //not payee or challenger
+        
         if (block.timestamp > lastMoveTime + 3600) {       // if the current block is an hour past the lastMove
             // refund the player who played last
 
