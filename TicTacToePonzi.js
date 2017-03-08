@@ -125,7 +125,6 @@ contract TicTacToePonzi {
     function startGame(uint money) public {
 
         // Insufficient funds
-        
 
         //check if 2 players are in gameStatus and both are not in a game already and no other game is going on
         if(inGame || currentPlayers.length != 2 || currentPlayers[0].addr == currentPlayers[1].addr || currentPlayers[0].playing || currentPlayers[1].playing) {
@@ -149,7 +148,6 @@ contract TicTacToePonzi {
         }
 
         else if(money * 10 / 11 >= buyInThreshold) {  //Challenger commits 1.1x buyIn by default. Refunded later if he wins and chooses not to increase
-            //then do stuff
 
             // Start the game.
             inGame = true;
@@ -306,8 +304,13 @@ contract TicTacToePonzi {
 
     function makeMove(uint row, uint col) returns (string, string, string) {
         //if (!inGame) throw; //no game going on
+
+        if (!inGame) throw; //no game going on
         uint place = getTile(row,col);
         uint curr = currentPlayer();
+        if (curr == 0 ||  players[getPlayerIndex(msg.sender)].addr != currentPlayers[curr].addr) throw; //not payee or challenger
+        if (players[getPlayerIndex(msg.sender)].addr != playerTurn.addr) throw; //not the right player
+
         //if (players[getPlayerIndex(msg.sender)].addr != currentPlayers[curr].addr) throw; //not payee or challenger
         
         if (block.timestamp > lastMoveTime + 3600) {       // if the current block is an hour past the lastMove
