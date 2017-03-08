@@ -128,12 +128,12 @@ contract TicTacToePonzi {
 
         //check if 2 players are in gameStatus and both are not in a game already and no other game is going on
         if(inGame || currentPlayers.length != 2 || currentPlayers[0].addr == currentPlayers[1].addr || currentPlayers[0].playing || currentPlayers[1].playing) {
-            throw;        // TODO remove this
+            throw;        
         }
 
         Player player = players[getPlayerIndex(msg.sender)];
         if(player.position != 1) {
-            throw;       // TODO remove this
+            throw;      
         }
 
         if(player.totalOwned < money) {
@@ -143,15 +143,14 @@ contract TicTacToePonzi {
 
         if(money * 10 / 11 < buyInThreshold) {
             player.deposit += money;
-            // TODO move player from the queue; if not, stop the game.
             return;
         }
 
-        else if(money * 10 / 11 >= buyInThreshold) {  //Challenger commits 1.1x buyIn by default. Refunded later if he wins and chooses not to increase
+        else if(money * 10 / 11 >= buyInThreshold) {  //Challenger commits 1.1x buyIn by default. 
 
             // Start the game.
             inGame = true;
-            lastMoveTime = block.timestamp;     // TODO is this right? Maybe we should wait for a move to be done?
+            lastMoveTime = block.timestamp;     
             player.totalOwned -= money;
 
             currentPlayers[0].playing = true;
@@ -162,7 +161,7 @@ contract TicTacToePonzi {
 
             playerTurn = currentPlayers[1];
 
-            // challenger chooses how much money to input (minimum 1.1 if he loses, 1.0 if he wins), gets refund if msg.value > chosen value
+            
 
         }
 
@@ -241,7 +240,6 @@ contract TicTacToePonzi {
      * The challenger becomes the payee, with the wager equal to how much they paid.
      */
     function payeeWinsOrDraws() private {
-        // TODO change player.totalOwned of payee
         currentPlayers[0].value = buyInThreshold;
         currentPlayers[1].value = buyInThreshold;
 
@@ -274,7 +272,6 @@ contract TicTacToePonzi {
      * Payee values remain the same.
      */
     function challengerWins() private {
-        // TODO How to account for the challenger being able to choose? We can give the win lower bounds?
         currentPlayers[1].value = buyInThreshold;
 
         inGame = false;
